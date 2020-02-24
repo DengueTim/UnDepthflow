@@ -61,16 +61,16 @@ class Model_eval_stereo(object):
     def __init__(self, scope=None):
         with tf.variable_scope(scope, reuse=True):
             input_uint8_1 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, 1],
                 name='raw_input_1')
             input_uint8_1r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, 1],
                 name='raw_input_1r')
             input_uint8_2 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, 1],
                 name='raw_input_2')
             input_uint8_2r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, 1],
                 name='raw_input_2r')
             input_intrinsic = tf.placeholder(tf.float32, [3, 3])
 

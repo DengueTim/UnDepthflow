@@ -9,23 +9,28 @@ from tensorflow.python.platform import flags
 FLAGS = flags.FLAGS
 
 
-def get_scaled_intrinsic_matrix(calib_file, zoom_x, zoom_y):
+def get_scaled_intrinsic_matrix(calib_file, zoom_x, zoom_y, offset_x=0, offset_y=0):
     intrinsics = load_intrinsics_raw(calib_file)
+
+    intrinsics[0, 2] -= offset_x
+    intrinsics[1, 2] -= offset_y
+
     intrinsics = scale_intrinsics(intrinsics, zoom_x, zoom_y)
 
     intrinsics[0, 1] = 0.0
     intrinsics[1, 0] = 0.0
     intrinsics[2, 0] = 0.0
     intrinsics[2, 1] = 0.0
+
     return intrinsics
 
 
 def load_intrinsics_raw(calib_file):
     filedata = read_raw_calib_file(calib_file)
-    if "P_rect_02" in filedata:
-        P_rect = filedata['P_rect_02']
+    if "P_rect_00" in filedata:
+        P_rect = filedata['P_rect_00']
     else:
-        P_rect = filedata['P2']
+        P_rect = filedata['P0']
     P_rect = np.reshape(P_rect, (3, 4))
     intrinsics = P_rect[:3, :3]
     return intrinsics

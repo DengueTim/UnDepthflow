@@ -16,6 +16,11 @@ import sys
 from tensorflow.python.platform import flags
 opt = flags.FLAGS
 
+def crop_center(img,cropx,cropy):
+    y,x = img.shape
+    startx = x//2-(cropx//2)
+    starty = y//2-(cropy//2)
+    return img[starty:starty+cropy,startx:startx+cropx]
 
 def test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015,
          noc_masks_2015, gt_masks):
@@ -47,26 +52,51 @@ def test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015,
 
             for i in range(total_img_num):
                 img1 = sm.imread(
-                    os.path.join(gt_dir, "image_2",
+                    os.path.join(gt_dir, "image_0",
                                  str(i).zfill(6) + "_10.png"))
                 img1_orig = img1
                 orig_H, orig_W = img1.shape[0:2]
+
+                orig_aspect_ratio = float(orig_H) / orig_W
+                required_aspect_ratio = float(opt.img_width) / opt.img_height
+
+                crop_height = orig_H
+                crop_width = orig_W
+                crop_offset_y = 0
+                crop_offset_x = 0
+
+                if (required_aspect_ratio / orig_aspect_ratio) > 1.01:
+                    crop_height = int(orig_W / required_aspect_ratio)
+                    crop_offset_y = int((orig_H - crop_height) / 2)
+
+                if (orig_aspect_ratio / required_aspect_ratio) > 1.01:
+                    crop_width = int(orig_H * required_aspect_ratio)
+                    crop_offset_x = int((orig_W - crop_width) / 2)
+
+                img1 = img1[crop_offset_y:crop_offset_y + crop_height, crop_offset_x:crop_offset_x + crop_width]
                 img1 = sm.imresize(img1, (opt.img_height, opt.img_width))
+                img1 = img1.reshape(opt.img_height, opt.img_width, 1)
 
                 img2 = sm.imread(
-                    os.path.join(gt_dir, "image_2",
+                    os.path.join(gt_dir, "image_0",
                                  str(i).zfill(6) + "_11.png"))
+                img2 = img2[crop_offset_y:crop_offset_y + crop_height, crop_offset_x:crop_offset_x + crop_width]
                 img2 = sm.imresize(img2, (opt.img_height, opt.img_width))
+                img2 = img2.reshape(opt.img_height, opt.img_width, 1)
 
                 imgr = sm.imread(
-                    os.path.join(gt_dir, "image_3",
+                    os.path.join(gt_dir, "image_1",
                                  str(i).zfill(6) + "_10.png"))
+                imgr = imgr[crop_offset_y:crop_offset_y + crop_height, crop_offset_x:crop_offset_x + crop_width]
                 imgr = sm.imresize(imgr, (opt.img_height, opt.img_width))
+                imgr = imgr.reshape(opt.img_height, opt.img_width, 1)
 
                 img2r = sm.imread(
-                    os.path.join(gt_dir, "image_3",
+                    os.path.join(gt_dir, "image_1",
                                  str(i).zfill(6) + "_11.png"))
+                img2r = img2r[crop_offset_y:crop_offset_y + crop_height, crop_offset_x:crop_offset_x + crop_width]
                 img2r = sm.imresize(img2r, (opt.img_height, opt.img_width))
+                img2r = img2r.reshape(opt.img_height, opt.img_width, 1)
 
                 img1 = np.expand_dims(img1, axis=0)
                 img2 = np.expand_dims(img2, axis=0)
@@ -79,7 +109,10 @@ def test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015,
                 input_intrinsic = get_scaled_intrinsic_matrix(
                     calib_file,
                     zoom_x=1.0 * opt.img_width / orig_W,
-                    zoom_y=1.0 * opt.img_height / orig_H)
+                    zoom_y=1.0 * opt.img_height / orig_H,
+                    offset_x=crop_offset_x,
+                    offset_y=crop_offset_y
+                )
 
                 pred_flow_rigid, pred_flow_optical, \
                 pred_disp, pred_disp2, pred_mask= sess.run([eval_model.pred_flow_rigid,
