@@ -61,7 +61,7 @@ def test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015,
                     os.path.join(gt_dir, "image_1" if opt.grey_scale else "image_3",
                                  str(i).zfill(6) + "_11.png"))
 
-                # img1_orig = img1
+                img1_orig = img1
 
                 img1 = sm_crop_n_resize(img1, opt.img_width, opt.img_height)
                 img2 = sm_crop_n_resize(img2, opt.img_width, opt.img_height)
@@ -111,15 +111,15 @@ def test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015,
                 test_result_disp.append(np.squeeze(pred_disp))
                 test_result_disp2.append(np.squeeze(pred_disp2))
                 test_result_mask.append(np.squeeze(pred_mask))
-                # test_image1.append(img1_orig)
+                test_image1.append(img1_orig)
 
             ## depth evaluation
             if opt.eval_depth and eval_data == "kitti_2015":
                 print("Evaluate depth at iter [" + str(itr) + "] " + eval_data)
-                gt_depths, pred_depths, gt_disparities, pred_disparities = load_depths(
+                gt_depths, pred_depths, gt_disparities, pred_disp_resized = load_depths(
                     test_result_disp, gt_dir, eval_occ=True)
                 abs_rel, sq_rel, rms, log_rms, a1, a2, a3, d1_all = eval_depth(
-                    gt_depths, pred_depths, gt_disparities, pred_disparities)
+                    gt_depths, pred_depths, gt_disparities, pred_disp_resized)
                 sys.stderr.write(
                     "{:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10}, {:>10} \n".
                     format('abs_rel', 'sq_rel', 'rms', 'log_rms', 'd1_all',

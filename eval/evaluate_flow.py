@@ -125,25 +125,15 @@ def eval_flow_avg(gt_flows,
     num = len(gt_flows)
     for gt_flow, noc_mask, pred_flow, i in zip(gt_flows, noc_masks, pred_flows,
                                                range(len(gt_flows))):
-        pred_flow = np.copy(pred_flow)
-
         H, W = gt_flow.shape[0:2]
 
-        # As the predicted flow can be cropped from the original aspect ratio we crop and scale the GT & mask to match.
-        gt_flow = sm_crop_n_resize(gt_flow, opt.img_width, opt.img_height)
-        gt_flow[:, :, 0] = gt_flow[:, :, 0] / W * opt.img_width
-        gt_flow[:, :, 1] = gt_flow[:, :, 1] / H * opt.img_height
+        pred_flow = np.copy(pred_flow)
+        pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
+        pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
 
-        noc_mask = sm_crop_n_resize(noc_mask, opt.img_width, opt.img_height)
-        noc_mask[noc_mask >= 0.5] = 1.0
-        noc_mask[noc_mask < 0.5] = 0.0
-
-        #pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
-        #pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
-        ##flo_pred = sm.imresize(pred_flow, (H, W), interp="bilinear", mode='F')
-        #flo_pred = cv2.resize(
-        #    pred_flow, (W, H), interpolation=cv2.INTER_LINEAR)
-
+        #flo_pred = sm.imresize(pred_flow, (H, W), interp="bilinear", mode='F')
+        flo_pred = cv2.resize(
+            pred_flow, (W, H), interpolation=cv2.INTER_LINEAR)
         if not os.path.exists(os.path.join(opt.trace, "pred_flow")):
             os.mkdir(os.path.join(opt.trace, "pred_flow"))
 
@@ -151,7 +141,7 @@ def eval_flow_avg(gt_flows,
             sm.imsave(
                 os.path.join(opt.trace, "pred_flow",
                              str(i).zfill(6) + "_10.png"),
-                flow_to_image(pred_flow))
+                flow_to_image(flo_pred))
             sm.imsave(
                 os.path.join(opt.trace, "pred_flow",
                              str(i).zfill(6) + "_10_gt.png"),
@@ -160,10 +150,10 @@ def eval_flow_avg(gt_flows,
                 os.path.join(opt.trace, "pred_flow",
                              str(i).zfill(6) + "_10_err.png"),
                 flow_to_image(
-                    (pred_flow - gt_flow[:, :, 0:2]) * gt_flow[:, :, 2:3]))
+                    (flo_pred - gt_flow[:, :, 0:2]) * gt_flow[:, :, 2:3]))
 
         epe_map = np.sqrt(
-            np.sum(np.square(pred_flow[:, :, 0:2] - gt_flow[:, :, 0:2]),
+            np.sum(np.square(flo_pred[:, :, 0:2] - gt_flow[:, :, 0:2]),
                    axis=2))
         error += np.sum(epe_map * gt_flow[:, :, 2]) / np.sum(gt_flow[:, :, 2])
 

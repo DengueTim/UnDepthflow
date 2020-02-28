@@ -1,12 +1,11 @@
 import os
 import numpy as np
 import scipy.misc as sm
-#import cv2
+import cv2
 import matplotlib.pyplot as plt
 import multiprocessing
 
 from tensorflow.python.platform import flags
-from eval.evaluation_utils import sm_crop_n_resize
 FLAGS = flags.FLAGS
 """
 Adopted from https://github.com/martinkersner/py_img_seg_eval
@@ -226,17 +225,11 @@ def eval_mask(pred_masks, gt_masks, opt):
 
     for i in range(200):
         gt_mask = gt_masks[i]
+        H, W = gt_mask.shape[0:2]
 
-        # H, W = gt_mask.shape[0:2]
-        # pred_mask = cv2.resize(
-        #    pred_masks[i], (W, H), interpolation=cv2.INTER_LINEAR)
+        pred_mask = cv2.resize(
+            pred_masks[i], (W, H), interpolation=cv2.INTER_LINEAR)
 
-        gt_mask = sm_crop_n_resize(gt_mask, opt.img_width, opt.img_height)
-        gt_mask[gt_mask >= 0.5] = 1.0
-        gt_mask[gt_mask < 0.5] = 0.0
-
-        # This may not be needed...
-        pred_mask = np.copy(pred_masks[i])
         pred_mask[pred_mask >= 0.5] = 1.0
         pred_mask[pred_mask < 0.5] = 0.0
 

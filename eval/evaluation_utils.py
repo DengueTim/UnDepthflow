@@ -96,36 +96,26 @@ def load_gt_disp_kitti(path, eval_occ):
 def convert_disps_to_depths_kitti(gt_disparities, pred_disparities):
     gt_depths = []
     pred_depths = []
-    gt_disparities_resized = []
+    pred_disparities_resized = []
 
     for i in range(len(gt_disparities)):
         gt_disp = gt_disparities[i]
+        height, width = gt_disp.shape
+
         pred_disp = pred_disparities[i]
-        gt_disp_width = gt_disp.shape[1]
-        height, width = pred_disp.shape
+        pred_disp = width * cv2.resize(
+            pred_disp, (width, height), interpolation=cv2.INTER_LINEAR)
 
-        pred_disp = gt_disp_width * pred_disp
-        gt_disp_resized, zoom_x, zoom_y, offset_x, offset_y = cv2_crop_n_resize(
-            gt_disp,
-            width,
-            height,
-            return_translation=True)
-        #pred_disp = width * cv2.resize(
-        #    pred_disp, (width, height), interpolation=cv2.INTER_LINEAR)
+        pred_disparities_resized.append(pred_disp)
 
-        gt_disparities_resized.append(gt_disp_resized)
+        mask = gt_disp > 0
 
-        mask = gt_disp_resized > 0
-
-        focal_length = width_to_focal[gt_disp_width] * zoom_x
-
-        # From disp/baseline(0.54) = focal/depth
-        gt_depth = focal_length * 0.54 / (gt_disp_resized + (1.0 - mask))
-        pred_depth = focal_length * 0.54 / pred_disp
+        gt_depth = width_to_focal[width] * 0.54 / (gt_disp + (1.0 - mask))
+        pred_depth = width_to_focal[width] * 0.54 / pred_disp
 
         gt_depths.append(gt_depth)
         pred_depths.append(pred_depth)
-    return gt_depths, pred_depths, gt_disparities_resized
+    return gt_depths, pred_depths, pred_disparities_resized
 
 
 def write_test_results(test_result_flow_optical, test_result_disp,
@@ -144,18 +134,18 @@ def write_test_results(test_result_flow_optical, test_result_disp,
         flow[:, :, 0] = flow[:, :, 0] / opt.img_width * W
         flow[:, :, 1] = flow[:, :, 1] / opt.img_height * H
 
-        #flow = cv2.resize(flow, (W, H), interpolation=cv2.INTER_LINEAR)
+        flow = cv2.resize(flow, (W, H), interpolation=cv2.INTER_LINEAR)
         write_flow_png(flow,
                        os.path.join(output_dir, mode, "flow",
                                     str(i).zfill(6) + "_10.png"))
 
-        #disp0 = W * cv2.resize(disp0, (W, H), interpolation=cv2.INTER_LINEAR)
+        disp0 = W * cv2.resize(disp0, (W, H), interpolation=cv2.INTER_LINEAR)
         skimage.io.imsave(
             os.path.join(output_dir, mode, "disp_0",
                          str(i).zfill(6) + "_10.png"),
             (disp0 * 256).astype('uint16'))
 
-        #disp1 = W * cv2.resize(disp1, (W, H), interpolation=cv2.INTER_LINEAR)
+        disp1 = W * cv2.resize(disp1, (W, H), interpolation=cv2.INTER_LINEAR)
         skimage.io.imsave(
             os.path.join(output_dir, mode, "disp_1",
                          str(i).zfill(6) + "_10.png"),
