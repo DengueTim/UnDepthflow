@@ -2,7 +2,6 @@ import os
 import numpy as np
 from flowlib import read_flow_png, flow_to_image
 import scipy.misc as sm
-import cv2
 import multiprocessing
 import functools
 from tensorflow.python.platform import flags
@@ -10,7 +9,9 @@ FLAGS = flags.FLAGS
 
 
 def get_scaled_intrinsic_matrix(calib_file, zoom_x, zoom_y, offset_x=0, offset_y=0):
+    #print(zoom_y, zoom_x, offset_y, offset_x)
     intrinsics = load_intrinsics_raw(calib_file)
+    #print "RAW:", intrinsics
 
     intrinsics[0, 2] -= offset_x
     intrinsics[1, 2] -= offset_y
@@ -22,15 +23,23 @@ def get_scaled_intrinsic_matrix(calib_file, zoom_x, zoom_y, offset_x=0, offset_y
     intrinsics[2, 0] = 0.0
     intrinsics[2, 1] = 0.0
 
+    #print "SCALED: ", intrinsics
+
     return intrinsics
 
 
 def load_intrinsics_raw(calib_file):
     filedata = read_raw_calib_file(calib_file)
-    if "P_rect_00" in filedata:
-        P_rect = filedata['P_rect_00']
+    if FLAGS.grey_scale:
+        if "P_rect_00" in filedata:
+            P_rect = filedata['P_rect_00']
+        else:
+            P_rect = filedata['P0']
     else:
-        P_rect = filedata['P0']
+        if "P_rect_02" in filedata:
+            P_rect = filedata['P_rect_02']
+        else:
+            P_rect = filedata['P2']
     P_rect = np.reshape(P_rect, (3, 4))
     intrinsics = P_rect[:3, :3]
     return intrinsics
@@ -116,15 +125,25 @@ def eval_flow_avg(gt_flows,
     num = len(gt_flows)
     for gt_flow, noc_mask, pred_flow, i in zip(gt_flows, noc_masks, pred_flows,
                                                range(len(gt_flows))):
+        pred_flow = np.copy(pred_flow)
+
         H, W = gt_flow.shape[0:2]
 
-        pred_flow = np.copy(pred_flow)
-        pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
-        pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
+        # As the predicted flow can be cropped from the original aspect ratio we crop and scale the GT & mask to match.
+        gt_flow = sm_crop_n_resize(gt_flow, opt.img_width, opt.img_height)
+        gt_flow[:, :, 0] = gt_flow[:, :, 0] / W * opt.img_width
+        gt_flow[:, :, 1] = gt_flow[:, :, 1] / H * opt.img_height
 
-        #flo_pred = sm.imresize(pred_flow, (H, W), interp="bilinear", mode='F')
-        flo_pred = cv2.resize(
-            pred_flow, (W, H), interpolation=cv2.INTER_LINEAR)
+        noc_mask = sm_crop_n_resize(noc_mask, opt.img_width, opt.img_height)
+        noc_mask[noc_mask >= 0.5] = 1.0
+        noc_mask[noc_mask < 0.5] = 0.0
+
+        #pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
+        #pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
+        ##flo_pred = sm.imresize(pred_flow, (H, W), interp="bilinear", mode='F')
+        #flo_pred = cv2.resize(
+        #    pred_flow, (W, H), interpolation=cv2.INTER_LINEAR)
+
         if not os.path.exists(os.path.join(opt.trace, "pred_flow")):
             os.mkdir(os.path.join(opt.trace, "pred_flow"))
 
@@ -132,7 +151,7 @@ def eval_flow_avg(gt_flows,
             sm.imsave(
                 os.path.join(opt.trace, "pred_flow",
                              str(i).zfill(6) + "_10.png"),
-                flow_to_image(flo_pred))
+                flow_to_image(pred_flow))
             sm.imsave(
                 os.path.join(opt.trace, "pred_flow",
                              str(i).zfill(6) + "_10_gt.png"),
@@ -141,10 +160,10 @@ def eval_flow_avg(gt_flows,
                 os.path.join(opt.trace, "pred_flow",
                              str(i).zfill(6) + "_10_err.png"),
                 flow_to_image(
-                    (flo_pred - gt_flow[:, :, 0:2]) * gt_flow[:, :, 2:3]))
+                    (pred_flow - gt_flow[:, :, 0:2]) * gt_flow[:, :, 2:3]))
 
         epe_map = np.sqrt(
-            np.sum(np.square(flo_pred[:, :, 0:2] - gt_flow[:, :, 0:2]),
+            np.sum(np.square(pred_flow[:, :, 0:2] - gt_flow[:, :, 0:2]),
                    axis=2))
         error += np.sum(epe_map * gt_flow[:, :, 2]) / np.sum(gt_flow[:, :, 2])
 

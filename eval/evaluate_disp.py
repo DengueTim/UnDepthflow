@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.misc as sm
-import cv2
+# import cv2
+
+from eval.evaluation_utils import sm_crop_n_resize
 
 
 def calculate_error_rate(epe_map, gt_disp, mask):
@@ -29,16 +31,19 @@ def eval_disp_avg(pred_disps, path, disp_num=None, moving_masks=None):
             gt_disp_noc = sm.imread(
                 path + "/disp_noc/" + str(i).zfill(6) + "_10.png", -1)
 
-        gt_disp = gt_disp.astype(np.float32) / 256.0
-        gt_disp_noc = gt_disp_noc.astype(np.float32) / 256.0
+        pred_H, pred_W = pred_disp.shape[0:2]
+        gt_disp_W = gt_disp.shape[1]
+        pred_disp = pred_W * pred_disp
+
+        gt_disp = sm_crop_n_resize(gt_disp, pred_W, pred_H)
+        gt_disp_noc = sm_crop_n_resize(gt_disp_noc, pred_W, pred_H)
 
         noc_mask = (gt_disp_noc > 0.0).astype(np.float32)
         valid_mask = (gt_disp > 0.0).astype(np.float32)
 
-        H, W = gt_disp.shape[0:2]
-
-        pred_disp = W * cv2.resize(
-            pred_disp, (W, H), interpolation=cv2.INTER_LINEAR)
+        #H, W = gt_disp.shape[0:2]
+        #pred_disp = W * cv2.resize(
+        #    pred_disp, (W, H), interpolation=cv2.INTER_LINEAR)
 
         epe_map = np.abs(pred_disp - gt_disp)
         error += np.sum(epe_map * valid_mask) / np.sum(valid_mask)
@@ -69,6 +74,6 @@ def eval_disp_avg(pred_disps, path, disp_num=None, moving_masks=None):
     else:
         result = "{:>10}, {:>10}, {:>10}, {:>10} \n".format(
             'epe', 'noc_rate', 'occ_rate', 'err_rate')
-        result += "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f} \n".format(
-            error / num, error_noc / num, error_occ / num, error_rate / num)
+        result += "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f} - {:10.4f}\n".format(
+            error / num, error_noc / num, error_occ / num, error_rate / num, np.sum(valid_mask))
         return result

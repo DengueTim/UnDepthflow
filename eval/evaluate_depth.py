@@ -4,10 +4,10 @@ from evaluation_utils import *
 # Adopted from https://github.com/mrharicot/monodepth
 def load_depths(pred_disp_org, gt_path, eval_occ):
     gt_disparities = load_gt_disp_kitti(gt_path, eval_occ)
-    gt_depths, pred_depths, pred_disparities_resized = convert_disps_to_depths_kitti(
+    gt_depths, pred_depths, gt_disparities_resized = convert_disps_to_depths_kitti(
         gt_disparities, pred_disp_org)
 
-    return gt_depths, pred_depths, gt_disparities, pred_disparities_resized
+    return gt_depths, pred_depths, gt_disparities_resized, pred_disp_org
 
 
 def process_depth(gt_depth, pred_depth, gt_disp, min_depth, max_depth):
@@ -23,7 +23,7 @@ def process_depth(gt_depth, pred_depth, gt_disp, min_depth, max_depth):
 def eval_depth(gt_depths,
                pred_depths,
                gt_disparities,
-               pred_disparities_resized,
+               pred_disparities,
                min_depth=1e-3,
                max_depth=80):
     num_samples = len(pred_depths)
@@ -48,7 +48,7 @@ def eval_depth(gt_depths,
 
         gt_disp = gt_disparities[i]
         mask = gt_disp > 0
-        pred_disp = pred_disparities_resized[i]
+        pred_disp = pred_disparities[i]
 
         disp_diff = np.abs(gt_disp[mask] - pred_disp[mask])
         bad_pixels = np.logical_and(disp_diff >= 3,

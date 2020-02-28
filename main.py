@@ -72,6 +72,7 @@ flags.DEFINE_float("flow_smooth_weight", 10.0, "Weight for flow smoothness")
 flags.DEFINE_float("flow_consist_weight", 0.01, "Weight for flow consistent")
 flags.DEFINE_float("flow_diff_threshold", 4.0,
                    "threshold when comparing optical flow and rigid flow ")
+flags.DEFINE_boolean("grey_scale", False, "whether images listed in train_file are gray scale or colour")
 
 flags.DEFINE_string('eval_pose', '', 'pose seq to evaluate')
 
@@ -83,7 +84,7 @@ def main(unused_argv):
     if FLAGS.trace == "":
         raise Exception("OUT_DIR must be specified")
 
-    print 'Constructing models and inputs.'
+    print 'Constructing models and inputs. grey_scale:%s img_height:%i img_width:%i' % (opt.grey_scale, opt.img_height, opt.img_width)
 
     if FLAGS.mode == "depthflow":  # stage 3: train depth and flow together
         Model = Model_depthflow

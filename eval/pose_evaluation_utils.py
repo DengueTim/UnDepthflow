@@ -4,6 +4,7 @@
 import math, re, os
 import numpy as np
 import scipy.misc as sm
+from evaluation_utils import sm_crop_n_resize
 from evaluate_flow import get_scaled_intrinsic_matrix
 
 from tensorflow.python.platform import flags
@@ -58,22 +59,33 @@ def pred_pose(eval_model, opt, sess, seqs):
                 re.sub('image_02', 'image_03', root_img_path + str(i + 1)
                        .zfill(10) + ".png"))
 
-            orig_H, orig_W = img1.shape[0:2]
-            img1 = sm.imresize(img1, (opt.img_height, opt.img_width))
-            img1 = np.expand_dims(img1, axis=0)
-            img2 = sm.imresize(img2, (opt.img_height, opt.img_width))
-            img2 = np.expand_dims(img2, axis=0)
+            img1 = sm_crop_n_resize(img1, opt.img_width, opt.img_height)
+            img2 = sm_crop_n_resize(img2, opt.img_width, opt.img_height)
+            imgr = sm_crop_n_resize(imgr, opt.img_width, opt.img_height)
+            img2r, zoom_x, zoom_y, offset_x, offset_y = sm_crop_n_resize(
+                img2r,
+                opt.img_width,
+                opt.img_height,
+                return_translation=True)
 
-            imgr = sm.imresize(imgr, (opt.img_height, opt.img_width))
+            colour_channels = 1 if opt.grey_scale else 3;
+            img1 = img1.reshape(opt.img_height, opt.img_width, colour_channels)
+            img2 = img2.reshape(opt.img_height, opt.img_width, colour_channels)
+            imgr = imgr.reshape(opt.img_height, opt.img_width, colour_channels)
+            img2r = img2r.reshape(opt.img_height, opt.img_width, colour_channels)
+
+            img1 = np.expand_dims(img1, axis=0)
+            img2 = np.expand_dims(img2, axis=0)
             imgr = np.expand_dims(imgr, axis=0)
-            img2r = sm.imresize(img2r, (opt.img_height, opt.img_width))
             img2r = np.expand_dims(img2r, axis=0)
 
             calib_file = opt.data_dir + "/" + date + "/calib_cam_to_cam.txt"
             input_intrinsic = get_scaled_intrinsic_matrix(
                 calib_file,
-                zoom_x=1.0 * opt.img_width / orig_W,
-                zoom_y=1.0 * opt.img_height / orig_H)
+                zoom_x=zoom_x,
+                zoom_y=zoom_y,
+                offset_x=offset_x,
+                offset_y=offset_y)
 
             pred_pose_mat, = sess.run([eval_model.pred_pose_mat],
                                       feed_dict={

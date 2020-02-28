@@ -12,7 +12,6 @@ Please see LICENSE_monodepth for details
 """
 
 from __future__ import absolute_import, division, print_function
-import sys
 import tensorflow as tf
 
 
@@ -20,20 +19,22 @@ def string_length_tf(t):
     return tf.py_func(len, [t], [tf.int64])
 
 
-def rescale_intrinsics(raw_cam_mat, opt, orig_height, orig_width, offset_y, offset_x):
+def rescale_intrinsics(raw_cam_mat, zoom_y, zoom_x, offset_y, offset_x):
+    #zoom_y = tf.Print(zoom_y, [zoom_y, zoom_x, offset_y, offset_x])
+
     fx = raw_cam_mat[0, 0]
     fy = raw_cam_mat[1, 1]
     cx = raw_cam_mat[0, 2]
     cy = raw_cam_mat[1, 2]
     r1 = tf.stack([
-        fx * opt.img_width / orig_width,
+        fx * zoom_x,
         0,
-        (cx - tf.cast(offset_x, dtype=tf.float32)) * opt.img_width / orig_width
+        (cx - tf.cast(offset_x, dtype=tf.float32)) * zoom_x
     ])
     r2 = tf.stack([
         0,
-        fy * opt.img_height / orig_height,
-        (cy - tf.cast(offset_y, dtype=tf.float32)) * opt.img_height / orig_height
+        fy * zoom_y,
+        (cy - tf.cast(offset_y, dtype=tf.float32)) * zoom_y
     ])
     r3 = tf.constant([0., 0., 1.])
     return tf.stack([r1, r2, r3])
@@ -79,20 +80,20 @@ def image_crop_height(image, new_height):
         offset_y,
         0,
         new_height,
-        image_width), offset_y
+        image_width), new_height, offset_y
 
 
 def image_crop_width(image, new_width):
     image_height = tf.shape(image)[0]
     image_width = tf.shape(image)[1]
     offset_x = tf.floordiv(image_width - new_width, 2)
-    # offset_x = tf.Print(offset_x, (image_width, image_height, offset_x, new_width))
+    #offset_x = tf.Print(offset_x, (image_width, image_height, offset_x, new_width))
     return tf.image.crop_to_bounding_box(
         image,
         0,
         offset_x,
         image_height,
-        new_width), offset_x
+        new_width), new_width, offset_x
 
 
 def data_augmentation(im, intrinsics, out_h, out_w):
@@ -156,8 +157,8 @@ class MonodepthDataloader(object):
         next_right_image_path = tf.string_join([self.data_path, split_line[3]])
         cam_intrinsic_path = tf.string_join([self.data_path, split_line[4]])
 
-        left_image_o, orig_height, orig_width, offset_y, offset_x = self.read_image(
-            left_image_path, get_shape=True)
+        left_image_o, zoom_y, zoom_x, offset_y, offset_x = self.read_image(
+            left_image_path, get_tramslation=True)
         right_image_o = self.read_image(right_image_path)
         next_left_image_o = self.read_image(next_left_image_path)
         next_right_image_o = self.read_image(next_right_image_path)
@@ -197,12 +198,15 @@ class MonodepthDataloader(object):
         lines = tf.string_split(
             [raw_cam_contents], delimiter="\n:").values
         lines = tf.reshape(lines, [-1, 2])
-        line = tf.boolean_mask(lines, tf.equal(lines[:,0], "P_rect_01"))
+        line = tf.boolean_mask(lines, tf.equal(lines[:,0], "P_rect_01" if opt.grey_scale else "P_rect_03"))
         raw_cam_vec = tf.string_to_number(
             tf.string_split([line[0,1]]).values)
         raw_cam_mat = tf.reshape(raw_cam_vec, [3, 4])
         raw_cam_mat = raw_cam_mat[0:3, 0:3]
-        raw_cam_mat = rescale_intrinsics(raw_cam_mat, opt, orig_height, orig_width, offset_y, offset_x)
+        #raw_cam_mat = tf.Print(raw_cam_mat, ["RAW:", raw_cam_mat[0], raw_cam_mat[1], raw_cam_mat[2]])
+        raw_cam_mat = rescale_intrinsics(raw_cam_mat, zoom_y, zoom_x, offset_y, offset_x)
+
+        #raw_cam_mat = tf.Print(raw_cam_mat, ["SCALED:", raw_cam_mat[0], raw_cam_mat[1], raw_cam_mat[2]])
 
         # Scale and crop augmentation
         #         im_batch = tf.concat([tf.expand_dims(left_image, 0), 
@@ -223,7 +227,7 @@ class MonodepthDataloader(object):
         self.data_batch = tf.train.shuffle_batch([
             left_image, right_image, next_left_image, next_right_image,
             proj_cam2pix, proj_pix2cam
-        ], opt.batch_size, capacity, min_after_dequeue, 10, name="MonodepthDataloader.shuffle_batch")
+        ], opt.batch_size, capacity, min_after_dequeue, 10)
 
     def augment_image_pair(self, left_image, right_image):
         # randomly shift gamma
@@ -272,9 +276,7 @@ class MonodepthDataloader(object):
 
         return image_list
 
-
-
-    def read_image(self, image_path, get_shape=False):
+    def read_image(self, image_path, get_tramslation=False):
         # tf.decode_image does not return the image size, this is an ugly workaround to handle both jpeg and png
         path_length = string_length_tf(image_path)[0]
         file_extension = tf.substr(image_path, path_length - 3, 3)
@@ -283,36 +285,38 @@ class MonodepthDataloader(object):
         image = tf.cond(
             file_cond, lambda: tf.image.decode_jpeg(tf.read_file(image_path)),
             lambda: tf.image.decode_png(tf.read_file(image_path)))
-        orig_height = tf.cast(tf.shape(image)[0], "float32")
-        orig_width = tf.cast(tf.shape(image)[1], "float32")
+        orig_height = tf.cast(tf.shape(image)[0], tf.float32)
+        orig_width = tf.cast(tf.shape(image)[1], tf.float32)
 
         image = tf.image.convert_image_dtype(image, tf.float32)
 
         orig_aspect_ratio = orig_width / orig_height
-        required_aspect_ratio = tf.cast(self.opt.img_width, dtype=tf.float32) / self.opt.img_height
-        do_crop_height = required_aspect_ratio / orig_aspect_ratio > 1.01
-        do_crop_width = orig_aspect_ratio / required_aspect_ratio > 1.01
-        image, offset_y = tf.cond(
+        required_aspect_ratio = tf.convert_to_tensor(self.opt.img_width / self.opt.img_height)
+        do_crop_height = required_aspect_ratio / orig_aspect_ratio > 1.02
+        do_crop_width = orig_aspect_ratio / required_aspect_ratio > 1.02
+
+        image, crop_height, offset_y = tf.cond(
             do_crop_height,
-            lambda: image_crop_height(image, tf.cast(orig_width / required_aspect_ratio, dtype="int32")),
-            lambda: (image, 0)
+            lambda: image_crop_height(image, tf.cast(orig_width / required_aspect_ratio, tf.int32)),
+            lambda: (image, tf.cast(orig_height, tf.int32), 0)
         )
 
-        image, offset_x = tf.cond(
+        image, crop_width, offset_x = tf.cond(
             do_crop_width,
-            lambda: image_crop_width(image, tf.cast(orig_height * required_aspect_ratio, dtype="int32")),
-            lambda: (image, 0)
+            lambda: image_crop_width(image, tf.cast(orig_height * required_aspect_ratio, tf.int32)),
+            lambda: (image, tf.cast(orig_width, tf.int32), 0)
         )
 
         image = tf.image.resize_images(
             image, [self.opt.img_height, self.opt.img_width],
             tf.image.ResizeMethod.AREA)
 
-        # image.set_shape([None, None, 3])
-        # BW not colour.
-        image.set_shape([None, None, 1])
+        image.set_shape([None, None, 1 if self.opt.grey_scale else 3])
 
-        if get_shape:
-            return image, orig_height, orig_width, offset_y, offset_x
+        zoom_y = tf.cast(self.opt.img_height / crop_height, tf.float32)
+        zoom_x = tf.cast(self.opt.img_width / crop_width, tf.float32)
+
+        if get_tramslation:
+            return image, zoom_y, zoom_x, offset_y, offset_x
         else:
             return image
