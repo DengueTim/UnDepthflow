@@ -26,15 +26,10 @@ def rescale_intrinsics(raw_cam_mat, zoom_y, zoom_x, offset_y, offset_x):
     fy = raw_cam_mat[1, 1]
     cx = raw_cam_mat[0, 2]
     cy = raw_cam_mat[1, 2]
-    r1 = tf.stack([
-        fx * zoom_x,
-        0,
-        (cx - tf.cast(offset_x, dtype=tf.float32)) * zoom_x
-    ])
+    r1 = tf.stack(
+        [fx * zoom_x, 0,(cx - tf.cast(offset_x, dtype=tf.float32)) * zoom_x])
     r2 = tf.stack([
-        0,
-        fy * zoom_y,
-        (cy - tf.cast(offset_y, dtype=tf.float32)) * zoom_y
+        0, fy * zoom_y, (cy - tf.cast(offset_y, dtype=tf.float32)) * zoom_y
     ])
     r3 = tf.constant([0., 0., 1.])
     return tf.stack([r1, r2, r3])

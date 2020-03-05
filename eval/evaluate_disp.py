@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.misc as sm
-import cv2
+
+from evaluation_utils import resize_prediction
 
 
 def calculate_error_rate(epe_map, gt_disp, mask):
@@ -35,10 +36,20 @@ def eval_disp_avg(pred_disps, path, disp_num=None, moving_masks=None):
         noc_mask = (gt_disp_noc > 0.0).astype(np.float32)
         valid_mask = (gt_disp > 0.0).astype(np.float32)
 
-        H, W = gt_disp.shape[0:2]
+        pred_H, pred_W = pred_disp.shape[0:2]
+        gt_H, gt_W = gt_disp.shape[0:2]
 
-        pred_disp = W * cv2.resize(
-            pred_disp, (W, H), interpolation=cv2.INTER_LINEAR)
+        pred_aspect_ratio = float(pred_W) / pred_H
+        gt_aspect_ratio = float(gt_W) / gt_H
+
+        pred_disp = np.copy(pred_disp)
+
+        if (gt_aspect_ratio / pred_aspect_ratio) > 1.02:
+            pred_disp *= int(gt_H * pred_aspect_ratio)
+        else:
+            pred_disp *= gt_W
+
+        pred_disp = resize_prediction(pred_disp, gt_disp)
 
         epe_map = np.abs(pred_disp - gt_disp)
         error += np.sum(epe_map * valid_mask) / np.sum(valid_mask)
@@ -69,6 +80,6 @@ def eval_disp_avg(pred_disps, path, disp_num=None, moving_masks=None):
     else:
         result = "{:>10}, {:>10}, {:>10}, {:>10} \n".format(
             'epe', 'noc_rate', 'occ_rate', 'err_rate')
-        result += "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f} - {:10.4f}\n".format(
-            error / num, error_noc / num, error_occ / num, error_rate / num, np.sum(valid_mask - noc_mask))
+        result += "{:10.4f}, {:10.4f}, {:10.4f}, {:10.4f} \n".format(
+            error / num, error_noc / num, error_occ / num, error_rate / num)
         return result

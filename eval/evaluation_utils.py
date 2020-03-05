@@ -5,24 +5,38 @@ import skimage.io
 import scipy.misc as sm
 from flowlib import write_flow_png
 
+def resize_prediction(pred_img, gt_img):
+    pred_H, pred_W = pred_img.shape[0:2]
+    gt_H, gt_W = gt_img.shape[0:2]
+
+    pred_aspect_ratio = float(pred_W) / pred_H
+    gt_aspect_ratio = float(gt_W) / gt_H
+
+    if (gt_aspect_ratio / pred_aspect_ratio) > 1.02:
+        # resize to same height and pad left and right.
+        new_pred_W = int(gt_H * pred_aspect_ratio)
+        offset_x = int((gt_W - new_pred_W) / 2)
+        img = cv2.resize(pred_img, (new_pred_W, gt_H), interpolation=cv2.INTER_LINEAR)
+        return np.concatenate(
+            (gt_img[:, :offset_x], img, gt_img[:, (offset_x + new_pred_W):]),
+            axis=1)
+    elif (pred_aspect_ratio / gt_aspect_ratio) > 1.02:
+        # resize to same width and pad top and bottom.
+        new_pred_H = int(gt_W / pred_aspect_ratio)
+        offset_y = int((gt_H - new_pred_H) / 2)
+        img = cv2.resize(pred_img, (gt_W, new_pred_H), interpolation=cv2.INTER_LINEAR)
+        return np.concatenate(
+            (gt_img[:offset_y, :], img, gt_img[(offset_y + new_pred_H):, :]),
+            axis=0)
+    else:
+        return cv2.resize(pred_img, (gt_W, gt_H), interpolation=cv2.INTER_LINEAR)
+
 
 def sm_crop_n_resize(img, new_W, new_H, return_translation=False):
-    def smResize(img, height, width):
-        return sm.imresize(img, (height, width))
-    return __crop_n_resize(img, new_W, new_H, return_translation, smResize)
-
-
-def cv2_crop_n_resize(img, new_W, new_H, return_translation=False):
-    def cv2resize(img, height, width):
-        return cv2.resize(img, (width, height), interpolation=cv2.INTER_LINEAR)
-
-    return __crop_n_resize(img, new_W, new_H, return_translation, cv2resize)
-
-def __crop_n_resize(img, new_W, new_H, return_translation, resize_func):
     orig_H, orig_W = img.shape[0:2]
 
     orig_aspect_ratio = float(orig_W) / orig_H
-    required_aspect_ratio = float(new_H) / new_W
+    required_aspect_ratio = float(new_W) / new_H
 
     crop_height = orig_H
     crop_width = orig_W
@@ -38,10 +52,10 @@ def __crop_n_resize(img, new_W, new_H, return_translation, resize_func):
         offset_x = int((orig_W - crop_width) / 2)
 
     img = img[offset_y:offset_y + crop_height, offset_x:offset_x + crop_width]
-    img = resize_func(img, new_H, new_W)
+    img = sm.imresize(img, (new_H, new_W))
 
-    zoom_y = new_H / crop_height
-    zoom_x = new_W / crop_width
+    zoom_y = float(new_H) / crop_height
+    zoom_x = float(new_W) / crop_width
 
     if return_translation:
         return img, zoom_x, zoom_y, offset_x, offset_y
@@ -100,18 +114,31 @@ def convert_disps_to_depths_kitti(gt_disparities, pred_disparities):
 
     for i in range(len(gt_disparities)):
         gt_disp = gt_disparities[i]
-        height, width = gt_disp.shape
+        H, W = gt_disp.shape
 
         pred_disp = pred_disparities[i]
-        pred_disp = width * cv2.resize(
-            pred_disp, (width, height), interpolation=cv2.INTER_LINEAR)
+
+        pred_disp = np.copy(pred_disp)
+
+        pred_H, pred_W = pred_disp.shape[0:2]
+
+        pred_aspect_ratio = float(pred_W) / pred_H
+        gt_aspect_ratio = float(W) / H
+
+        if (gt_aspect_ratio / pred_aspect_ratio) > 1.02:
+            pred_disp *= int(H * pred_aspect_ratio)
+        else:
+            pred_disp *= W
+
+        pred_disp = resize_prediction(pred_disp, gt_disp);
 
         pred_disparities_resized.append(pred_disp)
 
         mask = gt_disp > 0
+        pred_mask = pred_disp > 0
 
-        gt_depth = width_to_focal[width] * 0.54 / (gt_disp + (1.0 - mask))
-        pred_depth = width_to_focal[width] * 0.54 / pred_disp
+        gt_depth = width_to_focal[W] * 0.54 / (gt_disp + (1.0 - mask))
+        pred_depth = width_to_focal[W] * 0.54 / (pred_disp + (1.0 - pred_mask))
 
         gt_depths.append(gt_depth)
         pred_depths.append(pred_depth)

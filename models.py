@@ -215,17 +215,18 @@ class Model_flow(object):
 class Model_eval_flow(object):
     def __init__(self, scope=None):
         with tf.variable_scope(scope, reuse=True):
+            colour_channels = 1 if opt.grey_scale else 3
             input_uint8_1 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_1')
             input_uint8_1r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_1r')
             input_uint8_2 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_2')
             input_uint8_2r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_2r')
             input_intrinsic = tf.placeholder(tf.float32, [3, 3])
 
@@ -392,17 +393,18 @@ class Model_depth(object):
 class Model_eval_depth(object):
     def __init__(self, scope=None):
         with tf.variable_scope(scope, reuse=True):
+            colour_channels = 1 if opt.grey_scale else 3
             input_uint8_1 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_1')
             input_uint8_1r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_1r')
             input_uint8_2 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_2')
             input_uint8_2r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_2r')
             input_intrinsic = tf.placeholder(tf.float32, [3, 3])
 
@@ -659,17 +661,18 @@ class Model_depthflow(object):
 class Model_eval_depthflow(object):
     def __init__(self, scope=None):
         with tf.variable_scope(scope, reuse=True):
+            colour_channels = 1 if opt.grey_scale else 3
             input_uint8_1 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_1')
             input_uint8_1r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_1r')
             input_uint8_2 = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_2')
             input_uint8_2r = tf.placeholder(
-                tf.uint8, [1, opt.img_height, opt.img_width, 3],
+                tf.uint8, [1, opt.img_height, opt.img_width, colour_channels],
                 name='raw_input_2r')
             input_intrinsic = tf.placeholder(tf.float32, [3, 3])
 

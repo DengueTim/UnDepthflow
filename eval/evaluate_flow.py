@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from flowlib import read_flow_png, flow_to_image
+from evaluation_utils import resize_prediction
 import scipy.misc as sm
 import multiprocessing
 import functools
@@ -127,13 +128,25 @@ def eval_flow_avg(gt_flows,
                                                range(len(gt_flows))):
         H, W = gt_flow.shape[0:2]
 
+        pred_aspect_ratio = float(opt.img_width) / opt.img_height
+        gt_aspect_ratio = float(W) / H
+
         pred_flow = np.copy(pred_flow)
-        pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
-        pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
+
+        if (gt_aspect_ratio / pred_aspect_ratio) > 1.02:
+            pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_height * H
+            pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
+        elif (pred_aspect_ratio / gt_aspect_ratio) > 1.02:
+            pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
+            pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_width * W
+        else:
+            pred_flow[:, :, 0] = pred_flow[:, :, 0] / opt.img_width * W
+            pred_flow[:, :, 1] = pred_flow[:, :, 1] / opt.img_height * H
 
         #flo_pred = sm.imresize(pred_flow, (H, W), interp="bilinear", mode='F')
-        flo_pred = cv2.resize(
-            pred_flow, (W, H), interpolation=cv2.INTER_LINEAR)
+        #flo_pred = cv2.resize(
+        #    pred_flow, (W, H), interpolation=cv2.INTER_LINEAR)
+        flo_pred = resize_prediction(pred_flow, gt_flow[:, :, 0:2])
         if not os.path.exists(os.path.join(opt.trace, "pred_flow")):
             os.mkdir(os.path.join(opt.trace, "pred_flow"))
 
