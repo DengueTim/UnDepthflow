@@ -26,6 +26,8 @@ from loss_utils import average_gradients
 
 from test import test
 
+import sys
+
 # How often to record tensorboard summaries.
 SUMMARY_INTERVAL = 100
 
@@ -221,6 +223,8 @@ def main(unused_argv):
 
         # Create a saver.
         saver = tf.train.Saver(max_to_keep=10)
+        bestSaver = tf.train.Saver(max_to_keep=3)
+
 
         # Build the summary operation from the last tower summaries.
         summary_op = tf.summary.merge(summaries + summaries_cpu)
@@ -272,11 +276,12 @@ def main(unused_argv):
             gt_flows_2012, noc_masks_2012, gt_flows_2015, noc_masks_2015, gt_masks = \
               None, None, None, None, None
 
+        best_loss = 1
         # Run training.
         for itr in range(start_itr, FLAGS.num_iterations):
             if FLAGS.train_test == "train":
-                _, summary_str, summary_scalar_str = sess.run(
-                    [apply_gradient_op, summary_op, model.summ_op])
+                _, summary_str, summary_scalar_str, loss = sess.run(
+                    [apply_gradient_op, summary_op, model.summ_op, model.loss])
 
                 if (itr) % (SUMMARY_INTERVAL) == 2:
                     summary_writer.add_summary(summary_scalar_str, itr)
@@ -284,11 +289,21 @@ def main(unused_argv):
                 if (itr) % (SUMMARY_INTERVAL * 10) == 2:
                     summary_writer.add_summary(summary_str, itr)
 
-                if (itr) % (SAVE_INTERVAL) == 2:
-                    saver.save(
-                        sess, FLAGS.trace + '/model', global_step=global_step)
+                #if (itr) % (SAVE_INTERVAL) == 2:
+                #    saver.save(
+                #        sess, FLAGS.trace + '/model', global_step=global_step)
 
-            if (itr) % (VAL_INTERVAL) == 2 or FLAGS.train_test == "test":
+                if (best_loss * 0.99) > loss:
+                    best_loss = loss
+                    if (itr - start_itr) > 1000 :
+                        sys.stderr.write("Saving model for iteration %d with loss of %f\n" % (itr, loss));
+                        bestSaver.save(
+                            sess, FLAGS.trace + '/model', global_step=global_step)
+                        test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012,
+                             gt_flows_2015, noc_masks_2015, gt_masks)
+
+            #if (itr) % (VAL_INTERVAL) == 2 or FLAGS.train_test == "test":
+            if FLAGS.train_test == "test":
                 test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012,
                      gt_flows_2015, noc_masks_2015, gt_masks)
 
