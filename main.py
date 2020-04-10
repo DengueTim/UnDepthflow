@@ -27,6 +27,7 @@ from loss_utils import average_gradients
 from test import test
 
 import sys
+from bisect import bisect
 
 # How often to record tensorboard summaries.
 SUMMARY_INTERVAL = 100
@@ -77,6 +78,8 @@ flags.DEFINE_float("flow_diff_threshold", 4.0,
 flags.DEFINE_boolean("grey_scale", False, "whether images listed in train_file are gray scale or colour")
 
 flags.DEFINE_string('eval_pose', '', 'pose seq to evaluate')
+
+flags.DEFINE_float("best_loss_limit", 0.02, "Switch to saving and evaluating only the models with the best total loss")
 
 FLAGS.num_scales = 4
 opt = FLAGS
@@ -223,8 +226,6 @@ def main(unused_argv):
 
         # Create a saver.
         saver = tf.train.Saver(max_to_keep=10)
-        bestSaver = tf.train.Saver(max_to_keep=3)
-
 
         # Build the summary operation from the last tower summaries.
         summary_op = tf.summary.merge(summaries + summaries_cpu)
@@ -276,7 +277,9 @@ def main(unused_argv):
             gt_flows_2012, noc_masks_2012, gt_flows_2015, noc_masks_2015, gt_masks = \
               None, None, None, None, None
 
-        best_loss = 1
+        best_loss = 1.0
+        best_losses = []
+
         # Run training.
         for itr in range(start_itr, FLAGS.num_iterations):
             if FLAGS.train_test == "train":
@@ -286,21 +289,35 @@ def main(unused_argv):
                 if (itr) % (SUMMARY_INTERVAL) == 2:
                     summary_writer.add_summary(summary_scalar_str, itr)
 
-                if (itr) % (SUMMARY_INTERVAL * 10) == 2:
+                if (itr) % (SUMMARY_INTERVAL * 2) == 2:
                     summary_writer.add_summary(summary_str, itr)
 
-                #if (itr) % (SAVE_INTERVAL) == 2:
-                #    saver.save(
-                #        sess, FLAGS.trace + '/model', global_step=global_step)
+                if (itr) % (SAVE_INTERVAL) == 2 and len(best_losses) == 0:
+                    saver.save(
+                        sess, FLAGS.trace + '/model', global_step=global_step)
 
-                if (best_loss * 0.99) > loss:
+                if loss < best_loss:
                     best_loss = loss
-                    if (itr - start_itr) > 1000 :
-                        sys.stderr.write("Saving model for iteration %d with loss of %f\n" % (itr, loss));
-                        bestSaver.save(
-                            sess, FLAGS.trace + '/model', global_step=global_step)
-                        test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012,
-                             gt_flows_2015, noc_masks_2015, gt_masks)
+                #    if (itr - start_itr) > 1000 :
+                #        sys.stderr.write("Saving model for iteration %d with loss of %f\n" % (itr, loss));
+                #        bestSaver.save(
+                #            sess, FLAGS.trace + '/model', global_step=global_step)
+                #       test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012,
+                #             gt_flows_2015, noc_masks_2015, gt_masks)
+
+                if loss < FLAGS.best_loss_limit :
+                    while len(best_losses) < 3: # Initialised best_losses.
+                        best_losses.append((best_loss, tf.train.Saver(max_to_keep=1)));
+
+                    best_losses_idx = bisect(best_losses, (loss + 0.00001, None))
+                    if best_losses_idx < len(best_losses):
+                        position = best_losses_idx + 1
+                        sys.stderr.write("Saving model with lost of %f as model-%d. Position %d\n" % (loss, itr, position));
+                        (worst_best_loss, best_saver) = best_losses.pop()
+                        best_losses.insert(best_losses_idx, (loss, best_saver))
+                        best_saver.save(sess, FLAGS.trace + '/model', global_step=global_step)
+                        if (itr - start_itr) > SAVE_INTERVAL :
+                            test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015, noc_masks_2015, gt_masks)
 
             #if (itr) % (VAL_INTERVAL) == 2 or FLAGS.train_test == "test":
             if FLAGS.train_test == "test":

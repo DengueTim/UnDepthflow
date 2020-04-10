@@ -6,7 +6,7 @@ DIR_RELATIVE_TO_DATASET_ROOT=${1:-$THIS_DIR}
 
 unset i j k l
 
-for i in `ls *.png` ; do
+for i in `ls -v *.png` ; do
 	if [[ "$l" == *L.png ]]; then
 		echo "$DIR_RELATIVE_TO_DATASET_ROOT/$l" \
 			"$DIR_RELATIVE_TO_DATASET_ROOT/$k" \
