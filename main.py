@@ -281,7 +281,7 @@ def main(unused_argv):
         best_losses = []
 
         # Run training.
-        for itr in range(start_itr, FLAGS.num_iterations):
+        for itr in range(start_itr + 1, FLAGS.num_iterations + 1):
             if FLAGS.train_test == "train":
                 _, summary_str, summary_scalar_str, loss = sess.run(
                     [apply_gradient_op, summary_op, model.summ_op, model.loss])
@@ -292,7 +292,7 @@ def main(unused_argv):
                 if (itr) % (SUMMARY_INTERVAL * 2) == 2:
                     summary_writer.add_summary(summary_str, itr)
 
-                if (itr) % (SAVE_INTERVAL) == 2 and len(best_losses) == 0:
+                if (itr) % (SAVE_INTERVAL) == 2:
                     saver.save(
                         sess, FLAGS.trace + '/model', global_step=global_step)
 
@@ -319,8 +319,7 @@ def main(unused_argv):
                         if (itr - start_itr) > SAVE_INTERVAL :
                             test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012, gt_flows_2015, noc_masks_2015, gt_masks)
 
-            #if (itr) % (VAL_INTERVAL) == 2 or FLAGS.train_test == "test":
-            if FLAGS.train_test == "test":
+            if (itr) % (VAL_INTERVAL) == 2 or FLAGS.train_test == "test":
                 test(sess, eval_model, itr, gt_flows_2012, noc_masks_2012,
                      gt_flows_2015, noc_masks_2015, gt_masks)
 

@@ -32,10 +32,10 @@ def get_scaled_intrinsic_matrix(calib_file, zoom_x, zoom_y, offset_x=0, offset_y
 def load_intrinsics_raw(calib_file):
     filedata = read_raw_calib_file(calib_file)
     if FLAGS.grey_scale:
-        if "P_rect_00" in filedata:
-            P_rect = filedata['P_rect_00']
+        if "P_rect_01" in filedata:
+            P_rect = filedata['P_rect_01']
         else:
-            P_rect = filedata['P0']
+            P_rect = filedata['P1']
     else:
         if "P_rect_02" in filedata:
             P_rect = filedata['P_rect_02']
